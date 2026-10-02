@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
-import { placeOrderApi } from "../services/orderService.js";
+import {
+  placeOrderApi,
+  quoteOrderApi,
+} from "../services/orderService.js";
+
 import PaymentMethodSelector from "../components/PaymentMethodSelector.jsx";
 
 export default function Checkout() {
@@ -54,12 +58,13 @@ export default function Checkout() {
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState("");
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   // ==============================
   // Delivery Charge
   // ==============================
 
-  const shippingFee = 60;
+  const [shippingFee, setShippingFee] = useState(0);
 
   // ==============================
   // Calculate Subtotal
@@ -68,47 +73,137 @@ export default function Checkout() {
   const subtotal = checkoutItems.reduce((sum, item) => {
     const price =
       item.product.price -
-      (item.product.price * (item.product.discount || 0)) / 100;
+      (item.product.price *
+        (item.product.discount || 0)) /
+        100;
 
     return sum + price * item.quantity;
   }, 0);
 
   // ==============================
-  // Calculate Grand Total
+  // Get Shipping Quote
+  // ==============================
+
+  useEffect(() => {
+    if (checkoutItems.length === 0) {
+      setShippingFee(0);
+      return;
+    }
+
+    const getShippingQuote = async () => {
+      try {
+        const res = await quoteOrderApi({
+          subtotal,
+          district: form.district,
+          couponCode:
+            appliedCoupon || undefined,
+        });
+
+        const data = res.data.data;
+
+        setShippingFee(
+          Number(data.shippingFee || 0)
+        );
+
+        // Keep frontend discount synchronized
+        // with backend calculation
+        if (
+          appliedCoupon &&
+          data.couponValid
+        ) {
+          setDiscountAmount(
+            Number(data.discount || 0)
+          );
+        }
+      } catch (error) {
+        // Don't show error while simply
+        // changing district/address.
+        setShippingFee(0);
+      }
+    };
+
+    getShippingQuote();
+  }, [
+    subtotal,
+    form.district,
+    appliedCoupon,
+    checkoutItems.length,
+  ]);
+
+  // ==============================
+  // Grand Total
   // ==============================
 
   const grandTotal = Math.max(
     0,
-    subtotal + shippingFee - discountAmount
+    subtotal +
+      shippingFee -
+      discountAmount
   );
 
   // ==============================
   // Apply Coupon
   // ==============================
 
-  const handleApplyCoupon = (e) => {
+  const handleApplyCoupon = async (e) => {
     e.preventDefault();
 
-    if (!couponInput.trim()) {
-      toast.error("Please enter a promo or spin code");
+    const code = couponInput
+      .trim()
+      .toUpperCase();
+
+    if (!code) {
+      toast.error(
+        "Please enter a promo or spin code"
+      );
       return;
     }
 
-    const code = couponInput.trim().toUpperCase();
+    try {
+      setCouponLoading(true);
 
-    // Demo coupon validation
-    if (code.startsWith("SPIN") || code === "PROMO100") {
-      const discount = 100;
+      const res = await quoteOrderApi({
+        subtotal,
+        district: form.district,
+        couponCode: code,
+      });
 
-      setDiscountAmount(discount);
-      setAppliedCoupon(code);
+      const data = res.data.data;
 
-      toast.success("Coupon code applied successfully!");
-    } else {
-      setDiscountAmount(0);
+      setShippingFee(
+        Number(data.shippingFee || 0)
+      );
+
+      if (!data.couponValid) {
+        setAppliedCoupon("");
+        setDiscountAmount(0);
+
+        toast.error(
+          data.couponError ||
+            "Invalid or expired coupon"
+        );
+
+        return;
+      }
+
+      setAppliedCoupon(data.couponCode);
+      setDiscountAmount(
+        Number(data.discount || 0)
+      );
+
+      toast.success(
+        `Coupon applied! You saved ৳${data.discount}`
+      );
+    } catch (error) {
       setAppliedCoupon("");
+      setDiscountAmount(0);
 
-      toast.error("Invalid coupon code!");
+      toast.error(
+        error.response?.data?.message ||
+          "Invalid or expired coupon"
+      );
+    } finally {
+      setCouponLoading(false);
     }
   };
 
@@ -132,7 +227,9 @@ export default function Checkout() {
     e.preventDefault();
 
     if (checkoutItems.length === 0) {
-      toast.error("No items selected for checkout");
+      toast.error(
+        "No items selected for checkout"
+      );
       return;
     }
 
@@ -141,6 +238,7 @@ export default function Checkout() {
     try {
       const res = await placeOrderApi({
         shippingAddress: form,
+
         paymentMethod,
 
         manualPayment:
@@ -150,12 +248,15 @@ export default function Checkout() {
 
         selectedItems: selectedIds,
 
-        // Promo / Spin Code
-        couponCode: appliedCoupon || undefined,
-        discount: discountAmount,
+        // Only send coupon code.
+        // Backend calculates the actual discount.
+        couponCode:
+          appliedCoupon || undefined,
       });
 
-      toast.success("Order placed successfully!");
+      toast.success(
+        "Order placed successfully!"
+      );
 
       navigate(`/orders/${res.data._id}`);
     } catch (err) {
@@ -196,11 +297,15 @@ export default function Checkout() {
               className="flex justify-between text-sm"
             >
               <span>
-                {item.product.title} × {item.quantity}
+                {item.product.title} ×{" "}
+                {item.quantity}
               </span>
 
               <span>
-                ৳{(price * item.quantity).toFixed(0)}
+                ৳
+                {(
+                  price * item.quantity
+                ).toFixed(0)}
               </span>
             </div>
           );
@@ -335,7 +440,9 @@ export default function Checkout() {
                 placeholder="Enter Spin / Promo Code"
                 value={couponInput}
                 onChange={(e) =>
-                  setCouponInput(e.target.value)
+                  setCouponInput(
+                    e.target.value.toUpperCase()
+                  )
                 }
                 className="flex-1 border border-emerald-300 rounded-lg px-3.5 py-2 text-sm uppercase focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
               />
@@ -343,9 +450,12 @@ export default function Checkout() {
               <button
                 type="button"
                 onClick={handleApplyCoupon}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition"
+                disabled={couponLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Apply
+                {couponLoading
+                  ? "Checking..."
+                  : "Apply"}
               </button>
             </div>
           ) : (
@@ -362,7 +472,9 @@ export default function Checkout() {
 
               <button
                 type="button"
-                onClick={handleRemoveCoupon}
+                onClick={
+                  handleRemoveCoupon
+                }
                 className="text-xs font-semibold text-red-500 hover:text-red-700 underline"
               >
                 Remove
@@ -382,9 +494,13 @@ export default function Checkout() {
 
           <PaymentMethodSelector
             paymentMethod={paymentMethod}
-            setPaymentMethod={setPaymentMethod}
+            setPaymentMethod={
+              setPaymentMethod
+            }
             manualPayment={manualPayment}
-            setManualPayment={setManualPayment}
+            setManualPayment={
+              setManualPayment
+            }
           />
         </div>
 
@@ -397,22 +513,34 @@ export default function Checkout() {
 
           <div className="flex justify-between text-sm text-gray-600">
             <span>Subtotal</span>
-            <span>৳{subtotal.toFixed(0)}</span>
+
+            <span>
+              ৳{subtotal.toFixed(0)}
+            </span>
           </div>
 
           {/* Delivery */}
 
           <div className="flex justify-between text-sm text-gray-600">
             <span>Delivery Charge</span>
-            <span>৳{shippingFee}</span>
+
+            <span>
+              ৳{shippingFee.toFixed(0)}
+            </span>
           </div>
 
           {/* Discount */}
 
           {discountAmount > 0 && (
             <div className="flex justify-between text-sm text-emerald-600 font-medium">
-              <span>Spin / Promo Discount</span>
-              <span>-৳{discountAmount}</span>
+              <span>
+                Spin / Promo Discount
+              </span>
+
+              <span>
+                -৳
+                {discountAmount.toFixed(0)}
+              </span>
             </div>
           )}
 
@@ -432,9 +560,10 @@ export default function Checkout() {
             <button
               type="submit"
               disabled={
-                loading || checkoutItems.length === 0
+                loading ||
+                checkoutItems.length === 0
               }
-              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-semibold disabled:opacity-50"
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading
                 ? "Placing order..."
