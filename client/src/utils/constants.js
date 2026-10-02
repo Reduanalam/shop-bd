@@ -1,0 +1,1 @@
+export const BKASH_NAGAD_NUMBER = "01568540290";

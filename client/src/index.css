@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Hind Siliguri", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #16261d;
+}
+
+/* Ultra-Premium Luxury Button System */
+button, 
+.btn,
+a[role="button"] {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Base Hover: High-end Soft Floating & Deep Ambient Shadow */
+button:hover, 
+.btn:hover,
+a[role="button"]:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.15),
+              0 6px 12px -4px rgba(0, 0, 0, 0.08);
+}
+
+/* Primary/Brand Buttons Dynamic Neon Glow */
+button.bg-primary-600:hover,
+button.bg-green-600:hover,
+button.bg-emerald-600:hover,
+.btn-primary:hover {
+  box-shadow: 0 12px 28px -6px rgba(16, 185, 129, 0.4),
+              0 0 15px 1px rgba(16, 185, 129, 0.25);
+}
+
+/* Click/Press State (Tactile Spring Effect) */
+button:active, 
+.btn:active,
+a[role="button"]:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition-duration: 0.12s !important;
+}
+
+/* Sleek Inner Border Highlight (Glass Edge Effect) */
+button::before,
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.05) 40%,
+    rgba(0, 0, 0, 0.1)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+button:hover::before,
+.btn:hover::before {
+  opacity: 1;
+}
+
+/* Subtle Premium Light Sheen Sweep */
+button::after,
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--x, 50%) var(--y, 50%),
+    rgba(255, 255, 255, 0.2) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+button:hover::after,
+.btn:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes float-y { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+  .float-y { animation: float-y 5s ease-in-out infinite; }
+
+  @keyframes hero-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero-fade-in { animation: hero-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+  .hero-slide-img { transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1), transform 6000ms linear; }
+
+  @keyframes hero-progress { from { width: 0% } to { width: 100% } }
+  .hero-progress { animation-name: hero-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
+
+  @keyframes spin-wheel-turn { to { transform: rotate(var(--spin-end, 0deg)); } }
+  @keyframes ticker-in {
+    0% { opacity: 0; transform: translateY(8px); }
+    8%, 92% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide-img { transition: opacity 300ms linear; }
+}
